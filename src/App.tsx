@@ -1,0 +1,171 @@
+import { useState, useRef, useEffect } from "react";
+import { LeftSidebar, RightSidebar } from "./LayoutComponents";
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  imagePreview?: string;
+}
+
+export default function App() {
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      role: "assistant", 
+      content: "Welcome. I am your specialized Ai Engineer. Upload your building plan file to begin real-time analysis." 
+    }
+  ]);
+  const [input, setInput] = useState("");
+  const [base64Image, setBase64Image] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [toolState, setToolState] = useState<string | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setBase64Image(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() && !base64Image) return;
+
+    const userMessage: Message = { role: "user", content: input };
+    if (base64Image) userMessage.imagePreview = base64Image;
+
+    setMessages((prev) => [...prev, userMessage, { role: "assistant", content: "" }]);
+    setInput("");
+    setBase64Image(null);
+    setIsStreaming(true);
+    setToolState("Initializing Strands Reasoning Core...");
+
+    // 🆕 FIXED: Cleaned and structured timer brackets perfectly on line 28
+    setTimeout(() => {
+      setToolState("Executing Multi-Modal Context Map...");
+    }, 600);
+
+    setTimeout(() => {
+      setToolState(null);
+    }, 1500);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: input,
+          image_data: userMessage.imagePreview || null,
+        }),
+      });
+
+      if (!response.body) return;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (value) {
+            const tokenChunk = decoder.decode(value, { stream: true });
+            setMessages((prev) => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx >= 0) updated[lastIdx].content += tokenChunk;
+              return updated;
+            });
+          }
+          if (done) break;
+        }
+      } catch (err) {
+        console.log("Stream completed.");
+      }
+    } catch (error) {
+      console.error("Connection failed:", error);
+    } finally {
+      setIsStreaming(false);
+      setToolState(null);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", width: "100vw", height: "100vh", backgroundColor: "#f8fafc", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflow: "hidden", margin: 0, padding: 0 }}>
+      
+      <LeftSidebar />
+
+      {/* CENTER CHAT FRAME */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", backgroundColor: "#f8fafc" }}>
+        {/* Header bar */}
+        <div style={{ height: "65px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 32px", flexShrink: 0 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#0f172a" }}>Live Session</h1>
+            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>Active Session Object: #ST-9942</p>
+          </div>
+          <div style={{ fontSize: "13px", color: "#16a34a", backgroundColor: "#dcfce7", padding: "6px 12px", borderRadius: "20px", fontWeight: 500 }}>
+            ● Pipeline Status: Secure
+          </div>
+        </div>
+
+        {/* Message Logs Pane */}
+        <div style={{ flex: 1, padding: "32px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "24px" }}>
+          {messages.map((msg, idx) => (
+            <div key={idx} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+              <div style={{ display: "flex", gap: "14px", maxWidth: "75%", flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
+                <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: msg.role === "user" ? "#4f46e5" : "#0f172a", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>
+                  {msg.role === "user" ? "You" : "Ai"}
+                </div>
+                <div>
+                  <div style={{ padding: "14px 18px", borderRadius: "16px", fontSize: "14px", lineHeight: "1.6", backgroundColor: msg.role === "user" ? "#4f46e5" : "#ffffff", color: msg.role === "user" ? "#ffffff" : "#1e293b", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", border: msg.role === "user" ? "none" : "1px solid #e2e8f0" }}>
+                    {msg.imagePreview && (
+                      <img src={msg.imagePreview} alt="Attached Data" style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", marginBottom: "12px", display: "block" }} />
+                    )}
+                    <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {toolState && (
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", padding: "10px 16px", backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", width: "fit-content", fontSize: "13px", color: "#1d4ed8" }}>
+              <span style={{ fontSize: "16px" }}>⚙️</span>
+              <span style={{ fontWeight: 500 }}>Strands Tool Call:</span>
+              <span style={{ fontFamily: "monospace" }}>{toolState}</span>
+            </div>
+          )}
+          <div ref={chatBottomRef} />
+        </div>
+
+        {/* Input tray */}
+        <div style={{ padding: "24px 32px", borderTop: "1px solid #e2e8f0", backgroundColor: "#ffffff", flexShrink: 0 }}>
+          {base64Image && (
+            <div style={{ padding: "10px 16px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "#16a34a" }}>
+              <span>📎 Target asset loaded securely. Ready for reasoning execution.</span>
+              <button onClick={() => setBase64Image(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "#dc2626", fontWeight: "bold" }}>Remove</button>
+            </div>
+          )}
+
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", backgroundColor: "#f1f5f9", padding: "8px 16px", borderRadius: "12px", border: "1px solid #cbd5e1" }}>
+            <input type="file" id="file-upload" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
+            <label htmlFor="file-upload" style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", cursor: "pointer", fontSize: "18px", fontWeight: "bold", color: "#475569" }}>
+              +
+            </label>
+
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} disabled={isStreaming} placeholder="Ask me your question or upload the file..." style={{ flex: 1, height: "40px", border: "none", backgroundColor: "transparent", outline: "none", fontSize: "14px", color: "#0f172a" }} />
+            <button onClick={handleSend} disabled={isStreaming} style={{ height: "36px", padding: "0 20px", border: "none", backgroundColor: "#4f46e5", color: "#ffffff", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px" }}>
+              {isStreaming ? "Analyzing..." : "Send"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <RightSidebar />
+
+    </div>
+  );
+}

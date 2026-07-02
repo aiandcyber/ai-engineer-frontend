@@ -26,7 +26,18 @@ export const AUTH_ENABLED = AUTH_CONFIGURED
 export const AUTH_REQUIRED =
   AUTH_CONFIGURED && import.meta.env.VITE_AUTH_REQUIRED === 'true'
 
-/** Umbrella portal (landing). Production: ai-forall.org */
+/** Umbrella portal (landing). Local dev: :4321; production: ai-forall.org */
+export function portalUrl(): string {
+  const fromEnv = (import.meta.env.VITE_PORTAL_URL ?? '').trim()
+  if (fromEnv) return fromEnv.replace(/\/$/, '')
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:4321'
+  }
+  return 'https://ai-forall.org'
+}
+
+/** @deprecated use portalUrl() — kept for any static imports */
 export const PORTAL_URL = (import.meta.env.VITE_PORTAL_URL ?? 'https://ai-forall.org').replace(/\/$/, '')
 
 /** Resolve a backend-relative file URL against API_BASE when set. */

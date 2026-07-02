@@ -1,4 +1,4 @@
-import { USE_MOCK, AUTH_ENABLED } from '../config'
+import { USE_MOCK, AUTH_ENABLED, portalUrl } from '../config'
 import { AuthUserMenu } from './AuthUserMenu'
 
 export type Tab = 'analysis' | 'chat'
@@ -6,12 +6,12 @@ export type Tab = 'analysis' | 'chat'
 export function Header({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   return (
     <header className="topbar">
-      <div className="brand">
+      <a className="brand" href={portalUrl()}>
         <span className="brand-dot" />
-        <span className="brand-name">AI for All</span>
+        <span className="brand-name">AI-for All</span>
         <span className="brand-sep">·</span>
         <span className="brand-app">Construction</span>
-      </div>
+      </a>
       <nav className="tabs">
         <button className={`tab ${tab === 'analysis' ? 'tab-active' : ''}`} onClick={() => onTab('analysis')}>
           Analysis

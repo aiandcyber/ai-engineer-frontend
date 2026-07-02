@@ -1,0 +1,64 @@
+// API data contracts (mirror the FastAPI responses in backend/app/api/routes.py).
+
+export type InputKind = 'number' | 'text'
+export type JobStatus = 'complete' | 'needs_input' | 'error'
+
+export interface RequiredInput {
+  key: string
+  label: string
+  kind: InputKind
+  safety_critical: boolean
+  unit: string | null
+  default: unknown
+  choices: string[]
+}
+
+export interface UseCase {
+  name: string
+  title: string
+  knowledge_tags: string[]
+  required_inputs: RequiredInput[]
+}
+
+export interface Question {
+  key: string
+  label: string
+  kind: InputKind
+  unit: string | null
+  choices: string[]
+}
+
+export interface AnalyzeResult {
+  session_id: string
+  status: JobStatus
+  questions: Question[]
+  assumptions: string[]
+  unmapped_layers: string[]
+  summary_markdown: string | null
+  outputs: Record<string, string>
+  error: string | null
+}
+
+export interface UploadInstruction {
+  filename: string
+  key: string
+  url: string
+  method: string
+  headers: Record<string, string>
+  fields: Record<string, string>
+}
+
+export interface UploadInit {
+  session_id: string
+  uploads: UploadInstruction[]
+}
+
+export interface AnalyzeArgs {
+  useCase: string
+  location: string | null
+  sessionId: string | null
+  inputs: Record<string, unknown>
+  files: File[]
+  primaryFilename: string | null
+  converter: string | null
+}

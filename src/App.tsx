@@ -1,182 +1,149 @@
-import { useState, useRef, useEffect } from "react";
-import { LeftSidebar, RightSidebar } from "./LayoutComponents";
+import { useEffect, useMemo, useState } from 'react'
+import * as api from './api/client'
+import type { AnalyzeResult, Question, UseCase } from './api/types'
+import { Header, type Tab } from './components/Header'
+import { Stepper, type Phase } from './components/Stepper'
+import { SetupView } from './components/SetupView'
+import { IntakeView } from './components/IntakeView'
+import { ResultsView } from './components/ResultsView'
+import { ChatView } from './components/ChatView'
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  imagePreview?: string;
+const MAX_ROUNDS = 2
+
+function buildInputs(values: Record<string, string>, pack: UseCase | undefined): Record<string, unknown> {
+  const numberKeys = new Set(pack?.required_inputs.filter((r) => r.kind === 'number').map((r) => r.key))
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(values)) {
+    if (v === '' || v == null) continue
+    out[k] = numberKeys.has(k) ? Number(v) : v
+  }
+  return out
 }
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: "assistant", 
-      content: "Welcome. I am your specialized Ai Engineer. Upload your building plan file to begin real-time analysis." 
-    }
-  ]);
-  const [input, setInput] = useState("");
-  const [base64Image, setBase64Image] = useState<string | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [toolState, setToolState] = useState<string | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<Tab>('analysis')
+  const [useCases, setUseCases] = useState<UseCase[]>([])
+  const [useCaseName, setUseCaseName] = useState('')
+  const [location, setLocation] = useState('Minnesota, USA')
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [files, setFiles] = useState<File[]>([])
+  const [primary, setPrimary] = useState<string | null>(null)
+  const [converter, setConverter] = useState('libredwg')
+
+  const [phase, setPhase] = useState<Phase>('setup')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [round, setRound] = useState(0)
+  const [result, setResult] = useState<AnalyzeResult | null>(null)
+
+  const pack = useMemo(() => useCases.find((u) => u.name === useCaseName), [useCases, useCaseName])
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    api.listUseCases()
+      .then((list) => { setUseCases(list); if (list[0]) setUseCaseName(list[0].name) })
+      .catch((e: unknown) => setError(`Failed to load use cases: ${(e as Error).message}`))
+  }, [])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setBase64Image(reader.result as string);
-      reader.readAsDataURL(file);
+  const handleResult = (res: AnalyzeResult) => {
+    setSessionId(res.session_id)
+    if (res.status === 'error') {
+      setError(res.error ?? 'Analysis failed.')
+      setPhase('setup')
+      return
     }
-  };
+    if (res.status === 'needs_input') {
+      setQuestions(res.questions)
+      setRound((r) => Math.min(r + 1, MAX_ROUNDS))
+      setPhase('intake')
+      return
+    }
+    setResult(res)
+    setPhase('results')
+  }
 
-  const handleSend = async () => {
-    if (!input.trim() && !base64Image) return;
-
-    const userMessage: Message = { role: "user", content: input };
-    if (base64Image) userMessage.imagePreview = base64Image;
-
-    setMessages((prev) => [...prev, userMessage, { role: "assistant", content: "" }]);
-    setInput("");
-    setBase64Image(null);
-    setIsStreaming(true);
-    setToolState("Initializing Strands Reasoning Core...");
-
-    // 🆕 FIXED: Cleaned and structured timer brackets perfectly on line 28
-    setTimeout(() => {
-      setToolState("Executing Multi-Modal Context Map...");
-    }, 600);
-
-    setTimeout(() => {
-      setToolState(null);
-    }, 1500);
-
+  const runAnalyze = async () => {
+    setLoading(true); setError(null)
     try {
-      const response = await fetch("http://localhost:8000/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: input,
-          image_data: userMessage.imagePreview || null,
-        }),
-      });
-
-      if (!response.body) return;
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (value) {
-            const tokenChunk = decoder.decode(value, { stream: true });
-            {/*setMessages((prev) => {
-              const updated = [...prev];
-              const lastIdx = updated.length - 1;
-              if (lastIdx >= 0) updated[lastIdx].content += tokenChunk;
-              return updated;
-            });
-            */}
-            setMessages((prev) => {
-              const lastIdx = prev.length - 1;
-              if (lastIdx < 0) return prev;
-              const updated = [...prev];
-              updated[lastIdx] = {
-                ...updated[lastIdx],
-                content: updated[lastIdx].content + tokenChunk,
-              };
-              return updated;
-            });
-          }
-          if (done) break;
-        }
-      } catch (err) {
-        console.log("Stream completed.");
-      }
-    } catch (error) {
-      console.error("Connection failed:", error);
+      const res = await api.analyze({
+        useCase: useCaseName, location, sessionId: null,
+        inputs: buildInputs(values, pack), files,
+        primaryFilename: primary, converter,
+      })
+      handleResult(res)
+    } catch (e: unknown) {
+      setError((e as Error).message); setPhase('setup')
     } finally {
-      setIsStreaming(false);
-      setToolState(null);
+      setLoading(false)
     }
-  };
+  }
+
+  const submitIntake = async (answers: Record<string, string>) => {
+    const merged = { ...values, ...answers }
+    setValues(merged)
+    setLoading(true); setError(null)
+    try {
+      const res = await api.analyze({
+        useCase: useCaseName, location, sessionId,
+        inputs: buildInputs(merged, pack), files: [],
+        primaryFilename: primary, converter,
+      })
+      handleResult(res)
+    } catch (e: unknown) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const reset = () => {
+    setFiles([]); setPrimary(null); setValues({}); setResult(null)
+    setSessionId(null); setQuestions([]); setRound(0); setError(null); setPhase('setup')
+  }
 
   return (
-    <div style={{ display: "flex", width: "100vw", height: "100vh", backgroundColor: "#f8fafc", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflow: "hidden", margin: 0, padding: 0 }}>
-      
-      <LeftSidebar />
+    <div className="app">
+      <Header tab={tab} onTab={setTab} />
 
-      {/* CENTER CHAT FRAME */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", backgroundColor: "#f8fafc" }}>
-        {/* Header bar */}
-        <div style={{ height: "65px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 32px", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#0f172a" }}>Live Session</h1>
-            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>Active Session Object: #ST-9942</p>
-          </div>
-          <div style={{ fontSize: "13px", color: "#16a34a", backgroundColor: "#dcfce7", padding: "6px 12px", borderRadius: "20px", fontWeight: 500 }}>
-            ● Pipeline Status: Secure
-          </div>
-        </div>
+      {tab === 'chat' ? (
+        <main className="container">
+          <ChatView useCase={useCaseName} />
+        </main>
+      ) : (
+        <main className="container">
+          <Stepper phase={phase} />
 
-        {/* Message Logs Pane */}
-        <div style={{ flex: 1, padding: "32px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "24px" }}>
-          {messages.map((msg, idx) => (
-            <div key={idx} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-              <div style={{ display: "flex", gap: "14px", maxWidth: "75%", flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: msg.role === "user" ? "#4f46e5" : "#0f172a", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>
-                  {msg.role === "user" ? "You" : "Ai"}
-                </div>
-                <div>
-                  <div style={{ padding: "14px 18px", borderRadius: "16px", fontSize: "14px", lineHeight: "1.6", backgroundColor: msg.role === "user" ? "#4f46e5" : "#ffffff", color: msg.role === "user" ? "#ffffff" : "#1e293b", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", border: msg.role === "user" ? "none" : "1px solid #e2e8f0" }}>
-                    {msg.imagePreview && (
-                      <img src={msg.imagePreview} alt="Attached Data" style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", marginBottom: "12px", display: "block" }} />
-                    )}
-                    <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {toolState && (
-            <div style={{ display: "flex", gap: "10px", alignItems: "center", padding: "10px 16px", backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", width: "fit-content", fontSize: "13px", color: "#1d4ed8" }}>
-              <span style={{ fontSize: "16px" }}>⚙️</span>
-              <span style={{ fontWeight: 500 }}>Strands Tool Call:</span>
-              <span style={{ fontFamily: "monospace" }}>{toolState}</span>
-            </div>
-          )}
-          <div ref={chatBottomRef} />
-        </div>
-
-        {/* Input tray */}
-        <div style={{ padding: "24px 32px", borderTop: "1px solid #e2e8f0", backgroundColor: "#ffffff", flexShrink: 0 }}>
-          {base64Image && (
-            <div style={{ padding: "10px 16px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "#16a34a" }}>
-              <span>📎 Target asset loaded securely. Ready for reasoning execution.</span>
-              <button onClick={() => setBase64Image(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "#dc2626", fontWeight: "bold" }}>Remove</button>
-            </div>
+          {phase === 'setup' && (
+            <SetupView
+              useCases={useCases} useCaseName={useCaseName} onUseCase={setUseCaseName}
+              location={location} onLocation={setLocation}
+              values={values} onValue={(k, v) => setValues((s) => ({ ...s, [k]: v }))}
+              files={files} onFiles={setFiles}
+              primary={primary} onPrimary={setPrimary}
+              converter={converter} onConverter={setConverter}
+              onAnalyze={runAnalyze} loading={loading} error={error}
+            />
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", backgroundColor: "#f1f5f9", padding: "8px 16px", borderRadius: "12px", border: "1px solid #cbd5e1" }}>
-            <input type="file" id="file-upload" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
-            <label htmlFor="file-upload" style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", cursor: "pointer", fontSize: "18px", fontWeight: "bold", color: "#475569" }}>
-              +
-            </label>
+          {phase === 'intake' && (
+            <IntakeView
+              questions={questions} round={Math.max(round, 1)} maxRounds={MAX_ROUNDS}
+              loading={loading} onSubmit={submitIntake} onDefaults={() => submitIntake({})}
+            />
+          )}
 
-            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} disabled={isStreaming} placeholder="Ask me your question or upload the file..." style={{ flex: 1, height: "40px", border: "none", backgroundColor: "transparent", outline: "none", fontSize: "14px", color: "#0f172a" }} />
-            <button onClick={handleSend} disabled={isStreaming} style={{ height: "36px", padding: "0 20px", border: "none", backgroundColor: "#4f46e5", color: "#ffffff", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px" }}>
-              {isStreaming ? "Analyzing..." : "Send"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <RightSidebar />
-
+          {phase === 'results' && result && (
+            <ResultsView
+              result={result}
+              useCaseTitle={pack?.title ?? useCaseName}
+              location={location}
+              primaryName={primary}
+              onNew={reset}
+            />
+          )}
+        </main>
+      )}
     </div>
-  );
+  )
 }

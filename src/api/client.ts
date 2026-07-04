@@ -27,7 +27,12 @@ async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers)
   const auth = await authHeaders()
   for (const [k, v] of Object.entries(auth)) headers.set(k, v)
-  return fetch(url, { ...init, headers })
+  try {
+    return await fetch(url, { ...init, headers })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'network error'
+    throw new Error(`API request failed (${msg})`)
+  }
 }
 
 export async function listUseCases(): Promise<UseCase[]> {
@@ -42,7 +47,11 @@ async function initUploads(args: AnalyzeArgs): Promise<UploadInit> {
     use_case: args.useCase,
     location: args.location,
     session_id: args.sessionId,
-    files: args.files.map((f) => ({ filename: f.name, content_type: f.type || null })),
+    // Use a stable content type so the presigned PUT signature matches the browser PUT.
+    files: args.files.map((f) => ({
+      filename: f.name,
+      content_type: f.type || 'application/octet-stream',
+    })),
   }
   const res = await apiFetch(`${API_BASE}/api/uploads`, {
     method: 'POST',
@@ -54,13 +63,19 @@ async function initUploads(args: AnalyzeArgs): Promise<UploadInit> {
 
 async function putFile(file: File, instr: UploadInstruction): Promise<void> {
   const url = resolveUrl(instr.url)
+  // Only send headers returned by the backend — they must match the presigned URL.
   const headers = new Headers(instr.headers)
-  if (!headers.has('Content-Type') && file.type) headers.set('Content-Type', file.type)
 
   const isLocalApi = url.startsWith('/') || url.includes('/api/files/')
-  const res = isLocalApi
-    ? await apiFetch(url, { method: instr.method || 'PUT', headers, body: file })
-    : await fetch(url, { method: instr.method || 'PUT', headers, body: file })
+  let res: Response
+  try {
+    res = isLocalApi
+      ? await apiFetch(url, { method: instr.method || 'PUT', headers, body: file })
+      : await fetch(url, { method: instr.method || 'PUT', headers, body: file })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'network error'
+    throw new Error(`Upload to storage failed for ${file.name} (${msg})`)
+  }
 
   if (!res.ok) throw new Error(`Upload failed for ${file.name}: ${res.status}`)
 }

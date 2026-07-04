@@ -5,8 +5,8 @@
 // VITE_API_BASE : base URL for the API. Empty = same origin (dev proxy / prod
 //                 behind Cloudflare). Set to e.g. https://api.example.com if the
 //                 BFF is on another origin.
-// VITE_AUTH0_*       : Auth0 tenant settings (enables optional Sign in UI).
-// VITE_AUTH_REQUIRED : 'true' to require login for API calls (future); default off.
+// VITE_AUTH0_*       : Auth0 tenant settings (enables Sign in + action gating).
+// VITE_AUTH_REQUIRED : legacy flag; action gating uses AUTH_CONFIGURED when Auth0 is set.
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 export const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')

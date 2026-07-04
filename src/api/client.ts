@@ -10,9 +10,13 @@ async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = res.statusText
     try {
-      detail = (await res.json()).detail ?? detail
+      const body = await res.json()
+      detail = body.detail ?? detail
     } catch {
       /* ignore non-JSON error bodies */
+    }
+    if (res.status === 401) {
+      throw new Error('Please sign in to continue.')
     }
     throw new Error(`${res.status}: ${detail}`)
   }

@@ -2,6 +2,7 @@ import { Auth0Provider, useAuth0 } from '@auth0/auth0-react'
 import { useEffect, type ReactNode } from 'react'
 import { setAccessTokenGetter } from '../api/authToken'
 import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID, AUTH0_DOMAIN, AUTH_CONFIGURED } from '../config'
+import { AuthActionProvider } from './useRequireAuth'
 
 function TokenBridge() {
   const { getAccessTokenSilently, isAuthenticated } = useAuth0()
@@ -23,7 +24,9 @@ function TokenBridge() {
 }
 
 export function AuthShell({ children }: { children: ReactNode }) {
-  if (!AUTH_CONFIGURED) return <>{children}</>
+  if (!AUTH_CONFIGURED) {
+    return <AuthActionProvider>{children}</AuthActionProvider>
+  }
 
   return (
     <Auth0Provider
@@ -36,7 +39,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
       cacheLocation="localstorage"
     >
       <TokenBridge />
-      {children}
+      <AuthActionProvider>{children}</AuthActionProvider>
     </Auth0Provider>
   )
 }

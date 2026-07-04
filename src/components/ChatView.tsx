@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE, USE_MOCK } from '../config'
 import { authHeaders } from '../api/authToken'
+import { useRequireAuth } from '../auth/useRequireAuth'
 import { Markdown } from '../lib/markdown'
 
 interface Props {
@@ -61,6 +62,7 @@ async function streamChat(
     }),
   })
   if (!res.ok || !res.body) {
+    if (res.status === 401) throw new Error('Please sign in to continue.')
     throw new Error(`Chat failed (${res.status})`)
   }
 
@@ -74,6 +76,7 @@ async function streamChat(
 }
 
 export function ChatView({ useCase }: Props) {
+  const ensureAuth = useRequireAuth()
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -102,6 +105,7 @@ export function ChatView({ useCase }: Props) {
 
   async function handleSend() {
     if (!input.trim() && !base64Image) return
+    if (!(await ensureAuth())) return
 
     const text = input.trim()
     const imageData = base64Image

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from './api/client'
 import type { AnalyzeResult, Question, UseCase } from './api/types'
+import { useRequireAuth } from './auth/useRequireAuth'
 import { Header, type Tab } from './components/Header'
 import { Stepper, type Phase } from './components/Stepper'
 import { SetupView } from './components/SetupView'
@@ -21,6 +22,7 @@ function buildInputs(values: Record<string, string>, pack: UseCase | undefined):
 }
 
 export default function App() {
+  const ensureAuth = useRequireAuth()
   const [tab, setTab] = useState<Tab>('analysis')
   const [useCases, setUseCases] = useState<UseCase[]>([])
   const [useCaseName, setUseCaseName] = useState('')
@@ -64,6 +66,7 @@ export default function App() {
   }
 
   const runAnalyze = async () => {
+    if (!(await ensureAuth())) return
     setLoading(true); setError(null)
     try {
       const res = await api.analyze({
@@ -80,6 +83,7 @@ export default function App() {
   }
 
   const submitIntake = async (answers: Record<string, string>) => {
+    if (!(await ensureAuth())) return
     const merged = { ...values, ...answers }
     setValues(merged)
     setLoading(true); setError(null)

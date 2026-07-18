@@ -32,7 +32,11 @@ interface Props {
 
 export function SetupView(p: Props) {
   const pack = p.useCases.find((u) => u.name === p.useCaseName)
-  const canAnalyze = !!pack && p.files.some((f) => /\.(dwg|dxf|pdf)$/i.test(f.name)) && !p.loading
+  const requiredInputsReady = !!pack && pack.required_inputs
+    .filter((ri) => ri.safety_critical)
+    .every((ri) => String(p.values[ri.key] ?? '').trim() !== '')
+  const canAnalyze = !!pack && requiredInputsReady
+    && p.files.some((f) => /\.(dwg|dxf|pdf)$/i.test(f.name)) && !p.loading
 
   return (
     <div className="grid-2">
@@ -70,6 +74,9 @@ export function SetupView(p: Props) {
                       <input
                         className="input"
                         type={ri.kind === 'number' ? 'number' : 'text'}
+                        required={ri.safety_critical}
+                        min={ri.key === 'building_height' ? 0 : undefined}
+                        max={ri.key === 'building_height' ? 300 : undefined}
                         value={p.values[ri.key] ?? ''}
                         placeholder={ri.default != null ? `default: ${ri.default}` : 'Enter value'}
                         onChange={(e) => p.onValue(ri.key, e.target.value)}
@@ -100,7 +107,11 @@ export function SetupView(p: Props) {
           </button>
         </div>
         {!canAnalyze && !p.loading && (
-          <div className="hint-row">Add at least one drawing (DWG/DXF/PDF) to analyze.</div>
+          <div className="hint-row">
+            {!requiredInputsReady
+              ? 'Enter the required building height/drop length (maximum 300 ft).'
+              : 'Add at least one drawing (DWG/DXF/PDF) to analyze.'}
+          </div>
         )}
       </section>
     </div>

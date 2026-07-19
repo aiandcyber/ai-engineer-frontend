@@ -1,6 +1,6 @@
 // In-browser mock of the backend so the SPA runs with no server.
 // Mirrors the shapes and behaviour of backend/app/api/routes.py.
-import type { AnalyzeArgs, AnalyzeResult, PreviousReport, UseCase } from './types'
+import type { AnalysisProgress, AnalyzeArgs, AnalyzeResult, PreviousReport, UseCase } from './types'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -147,8 +147,19 @@ function buildOutputs(): Record<string, string> {
   }
 }
 
-export async function analyze(args: AnalyzeArgs): Promise<AnalyzeResult> {
-  await delay(750)
+export async function analyze(
+  args: AnalyzeArgs,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<AnalyzeResult> {
+  for (const progress of [
+    { stage: 'extracting', percent: 15 },
+    { stage: 'preparing', percent: 35 },
+    { stage: 'optimizing', percent: 60 },
+    { stage: 'rendering', percent: 90 },
+  ]) {
+    onProgress?.(progress)
+    await delay(250)
+  }
   const missing = SAFETY_KEYS.filter(
     (k) => args.inputs[k] == null || args.inputs[k] === '',
   )

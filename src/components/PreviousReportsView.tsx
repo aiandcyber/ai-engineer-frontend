@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../api/client'
 import type { PreviousReport, ReportStatus } from '../api/types'
 import { resolveUrl } from '../config'
@@ -28,16 +28,21 @@ export function PreviousReportsView() {
   const [reports, setReports] = useState<PreviousReport[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const requestVersion = useRef(0)
 
   const load = useCallback(async () => {
+    const request = ++requestVersion.current
     setLoading(true)
     setError(null)
     try {
-      setReports(await api.listPreviousReports())
+      const nextReports = await api.listPreviousReports()
+      if (request === requestVersion.current) setReports(nextReports)
     } catch (reason) {
-      setError((reason as Error).message)
+      if (request === requestVersion.current) {
+        setError((reason as Error).message)
+      }
     } finally {
-      setLoading(false)
+      if (request === requestVersion.current) setLoading(false)
     }
   }, [])
 
@@ -45,12 +50,28 @@ export function PreviousReportsView() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    const handleAuthChange = (event: Event) => {
+      const identity = (event as CustomEvent<{ identity?: string }>).detail?.identity
+      requestVersion.current += 1
+      setReports([])
+      setError(null)
+      if (identity) {
+        void load()
+      } else {
+        setLoading(false)
+      }
+    }
+    window.addEventListener('auth-session-changed', handleAuthChange)
+    return () => window.removeEventListener('auth-session-changed', handleAuthChange)
+  }, [load])
+
   return (
     <section className="previous-reports">
       <div className="previous-reports-head">
         <div>
           <h1 className="previous-reports-title">Previous Reports</h1>
-          <p className="previous-reports-note">Only reports within the configured retention period are shown.</p>
+          <p className="previous-reports-note">Reports are retained for 7 days.</p>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={loading}>
           Refresh

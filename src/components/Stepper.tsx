@@ -1,8 +1,9 @@
-export type Phase = 'setup' | 'intake' | 'results'
+export type Phase = 'setup' | 'intake' | 'processing' | 'results'
 
 const STEPS: { id: Phase; label: string }[] = [
   { id: 'setup', label: 'Setup' },
   { id: 'intake', label: 'Details' },
+  { id: 'processing', label: 'Processing' },
   { id: 'results', label: 'Results' },
 ]
 

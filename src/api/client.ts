@@ -4,7 +4,7 @@
 import { API_BASE, USE_MOCK, resolveUrl } from '../config'
 import { authHeaders } from './authToken'
 import * as mock from './mock'
-import type { AnalyzeArgs, AnalyzeResult, PreviousReport, UploadInit, UploadInstruction, UseCase } from './types'
+import type { AnalysisProgress, AnalyzeArgs, AnalyzeResult, PreviousReport, UploadInit, UploadInstruction, UseCase } from './types'
 
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -99,8 +99,56 @@ async function uploadFiles(args: AnalyzeArgs, init: UploadInit): Promise<string[
   return keys
 }
 
-export async function analyze(args: AnalyzeArgs): Promise<AnalyzeResult> {
-  if (USE_MOCK) return mock.analyze(args)
+async function readAnalysisStream(
+  res: Response,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<AnalyzeResult> {
+  if (!res.ok) await asJson<never>(res)
+  if (!res.body) throw new Error('The server did not provide an analysis stream.')
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const parseFrame = (frame: string): AnalyzeResult | null => {
+    let event = ''
+    let data = ''
+    for (const line of frame.split(/\r?\n/)) {
+      if (line.startsWith('event:')) event = line.slice(6).trim()
+      if (line.startsWith('data:')) data += line.slice(5).trim()
+    }
+    if (!data) return null
+    const payload = JSON.parse(data) as AnalysisProgress | AnalyzeResult
+    if (event === 'progress') {
+      onProgress?.(payload as AnalysisProgress)
+      return null
+    }
+    return event === 'result' ? payload as AnalyzeResult : null
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value, { stream: !done })
+    const frames = buffer.split(/\r?\n\r?\n/)
+    buffer = frames.pop() ?? ''
+    for (const frame of frames) {
+      const result = parseFrame(frame)
+      if (result) return result
+    }
+    if (done) break
+  }
+  if (buffer.trim()) {
+    const result = parseFrame(buffer)
+    if (result) return result
+  }
+  throw new Error('The analysis stream ended before a result was received.')
+}
+
+export async function analyze(
+  args: AnalyzeArgs,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<AnalyzeResult> {
+  if (USE_MOCK) return mock.analyze(args, onProgress)
 
   const fd = new FormData()
   fd.append('use_case', args.useCase)
@@ -109,14 +157,19 @@ export async function analyze(args: AnalyzeArgs): Promise<AnalyzeResult> {
   fd.append('inputs', JSON.stringify(args.inputs ?? {}))
   if (args.primaryFilename) fd.append('primary_filename', args.primaryFilename)
   if (args.converter) fd.append('converter', args.converter)
+  fd.append('stream_response', 'true')
 
   if (args.files.length > 0) {
+    onProgress?.({ stage: 'uploading', percent: 3 })
     const init = await initUploads(args)
     const keys = await uploadFiles(args, init)
     fd.set('session_id', init.session_id)
     fd.append('file_keys', JSON.stringify(keys))
+    onProgress?.({
+      stage: 'uploading', percent: 8, analysis_id: init.session_id,
+    })
   }
 
   const res = await apiFetch(`${API_BASE}/api/analyze`, { method: 'POST', body: fd })
-  return asJson<AnalyzeResult>(res)
+  return readAnalysisStream(res, onProgress)
 }

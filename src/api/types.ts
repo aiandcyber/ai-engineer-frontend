@@ -46,6 +46,12 @@ export interface AnalyzeResult {
   }[]
 }
 
+export interface AnalysisProgress {
+  stage: string
+  percent: number
+  analysis_id?: string
+}
+
 export interface PreviousReport {
   id: string
   original_filename: string | null

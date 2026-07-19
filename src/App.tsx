@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from './api/client'
-import type { AnalyzeResult, Question, UseCase } from './api/types'
+import type { AnalysisProgress, AnalyzeResult, Question, UseCase } from './api/types'
 import { useRequireAuth } from './auth/useRequireAuth'
 import { Header, type Tab } from './components/Header'
 import { Stepper, type Phase } from './components/Stepper'
@@ -9,6 +9,7 @@ import { IntakeView } from './components/IntakeView'
 import { ResultsView } from './components/ResultsView'
 import { ChatView } from './components/ChatView'
 import { PreviousReportsView } from './components/PreviousReportsView'
+import { ProcessingView } from './components/ProcessingView'
 
 const MAX_ROUNDS = 2
 
@@ -40,6 +41,10 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [round, setRound] = useState(0)
   const [result, setResult] = useState<AnalyzeResult | null>(null)
+  const [progress, setProgress] = useState<AnalysisProgress>({
+    stage: 'starting',
+    percent: 1,
+  })
 
   const pack = useMemo(() => useCases.find((u) => u.name === useCaseName), [useCases, useCaseName])
 
@@ -66,15 +71,22 @@ export default function App() {
     setPhase('results')
   }
 
+  const handleProgress = (update: AnalysisProgress) => {
+    setProgress(update)
+    if (update.analysis_id) setSessionId(update.analysis_id)
+  }
+
   const runAnalyze = async () => {
     if (!(await ensureAuth())) return
     setLoading(true); setError(null)
+    setProgress({ stage: 'starting', percent: 1 })
+    setPhase('processing')
     try {
       const res = await api.analyze({
         useCase: useCaseName, location, sessionId: null,
         inputs: buildInputs(values, pack), files,
         primaryFilename: primary, converter,
-      })
+      }, handleProgress)
       handleResult(res)
     } catch (e: unknown) {
       setError((e as Error).message); setPhase('setup')
@@ -88,15 +100,18 @@ export default function App() {
     const merged = { ...values, ...answers }
     setValues(merged)
     setLoading(true); setError(null)
+    setProgress({ stage: 'starting', percent: 1 })
+    setPhase('processing')
     try {
       const res = await api.analyze({
         useCase: useCaseName, location, sessionId,
         inputs: buildInputs(merged, pack), files: [],
         primaryFilename: primary, converter,
-      })
+      }, handleProgress)
       handleResult(res)
     } catch (e: unknown) {
       setError((e as Error).message)
+      setPhase('intake')
     } finally {
       setLoading(false)
     }
@@ -105,6 +120,7 @@ export default function App() {
   const reset = () => {
     setFiles([]); setPrimary(null); setValues({}); setResult(null)
     setSessionId(null); setQuestions([]); setRound(0); setError(null); setPhase('setup')
+    setProgress({ stage: 'starting', percent: 1 })
   }
 
   return (
@@ -139,6 +155,14 @@ export default function App() {
             <IntakeView
               questions={questions} round={Math.max(round, 1)} maxRounds={MAX_ROUNDS}
               loading={loading} onSubmit={submitIntake} onDefaults={() => submitIntake({})}
+            />
+          )}
+
+          {phase === 'processing' && (
+            <ProcessingView
+              analysisId={sessionId}
+              percent={progress.percent}
+              stage={progress.stage}
             />
           )}
 

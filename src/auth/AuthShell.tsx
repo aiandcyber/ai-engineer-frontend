@@ -5,11 +5,12 @@ import { AUTH0_AUDIENCE, AUTH0_CLIENT_ID, AUTH0_DOMAIN, AUTH_CONFIGURED } from '
 import { AuthActionProvider } from './useRequireAuth'
 
 function TokenBridge() {
-  const { getAccessTokenSilently, isAuthenticated } = useAuth0()
+  const { getAccessTokenSilently, isAuthenticated, user } = useAuth0()
 
   useEffect(() => {
     if (!isAuthenticated) {
       setAccessTokenGetter(null)
+      window.dispatchEvent(new CustomEvent('auth-session-changed'))
       return
     }
     setAccessTokenGetter(() =>
@@ -17,8 +18,11 @@ function TokenBridge() {
         authorizationParams: { audience: AUTH0_AUDIENCE },
       }),
     )
+    window.dispatchEvent(new CustomEvent('auth-session-changed', {
+      detail: { identity: user?.sub ?? null },
+    }))
     return () => setAccessTokenGetter(null)
-  }, [getAccessTokenSilently, isAuthenticated])
+  }, [getAccessTokenSilently, isAuthenticated, user?.sub])
 
   return null
 }

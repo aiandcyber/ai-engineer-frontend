@@ -612,6 +612,103 @@ button, input, select, textarea { font: inherit; }
   .report-meta .pill { align-self: flex-start; }
 }
 
+/* Analysis processing */
+.processing-view {
+  max-width: 760px;
+  margin: 36px auto;
+  padding: 40px;
+  text-align: center;
+}
+.processing-view h1 { margin: 20px 0 8px; }
+.processing-message { min-height: 24px; color: var(--slate-600); }
+.processing-progress {
+  height: 10px;
+  margin: 24px 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--slate-100);
+}
+.processing-progress span {
+  position: relative;
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--indigo);
+  transition: width 0.5s ease;
+}
+.processing-progress span i {
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: rgba(255, 255, 255, 0.38);
+  transform: skewX(-20deg);
+  animation: processing-shimmer 0.8s linear infinite;
+}
+.processing-meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--slate-500);
+  font-size: 12px;
+}
+.processing-activity {
+  margin-top: 24px;
+  overflow: hidden;
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  background: var(--slate-50);
+  text-align: left;
+}
+.processing-activity-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--slate-200);
+  color: var(--slate-600);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.processing-activity-title strong { color: var(--green); }
+.processing-activity-line {
+  display: grid;
+  grid-template-columns: 38px 1fr 9px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  color: var(--slate-500);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+.processing-activity-line:last-child {
+  color: var(--slate-700);
+  background: #fff;
+}
+.processing-activity-line p { margin: 0; }
+.processing-activity-line i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: processing-blink 0.6s ease-in-out infinite alternate;
+}
+.processing-note {
+  margin: 24px 0 0;
+  color: var(--slate-500);
+  font-size: 13px;
+}
+@keyframes processing-shimmer {
+  from { left: -55%; }
+  to { left: 120%; }
+}
+@keyframes processing-blink {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+
 /* Markdown report */
 .md { font-size: 14px; color: var(--slate-700); }
 .md-h2 { font-size: 18px; margin: 20px 0 10px; color: var(--slate-900); }

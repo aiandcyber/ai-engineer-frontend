@@ -1,7 +1,7 @@
 import { USE_MOCK, AUTH_ENABLED, portalUrl } from '../config'
 import { AuthUserMenu } from './AuthUserMenu'
 
-export type Tab = 'analysis' | 'chat'
+export type Tab = 'analysis' | 'reports' | 'chat'
 
 export function Header({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   return (
@@ -18,6 +18,9 @@ export function Header({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
         </button>
         <button className={`tab ${tab === 'chat' ? 'tab-active' : ''}`} onClick={() => onTab('chat')}>
           Chat
+        </button>
+        <button className={`tab ${tab === 'reports' ? 'tab-active' : ''}`} onClick={() => onTab('reports')}>
+          Previous Reports
         </button>
       </nav>
       <div className="topbar-right">

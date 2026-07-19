@@ -4,7 +4,7 @@
 import { API_BASE, USE_MOCK, resolveUrl } from '../config'
 import { authHeaders } from './authToken'
 import * as mock from './mock'
-import type { AnalyzeArgs, AnalyzeResult, UploadInit, UploadInstruction, UseCase } from './types'
+import type { AnalyzeArgs, AnalyzeResult, PreviousReport, UploadInit, UploadInstruction, UseCase } from './types'
 
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -40,6 +40,13 @@ export async function listUseCases(): Promise<UseCase[]> {
   const res = await apiFetch(`${API_BASE}/api/usecases`)
   const data = await asJson<{ usecases: UseCase[] }>(res)
   return data.usecases
+}
+
+export async function listPreviousReports(): Promise<PreviousReport[]> {
+  if (USE_MOCK) return mock.listPreviousReports()
+  const res = await apiFetch(`${API_BASE}/api/jobs`)
+  const data = await asJson<{ jobs: PreviousReport[] }>(res)
+  return data.jobs
 }
 
 async function initUploads(args: AnalyzeArgs): Promise<UploadInit> {

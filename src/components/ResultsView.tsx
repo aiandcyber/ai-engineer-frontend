@@ -7,7 +7,8 @@ type ResultTab = 'summary' | 'diagram' | 'downloads'
 
 const DOWNLOADS: { key: string; label: string; file: string }[] = [
   { key: 'svg', label: 'Diagram (SVG)', file: 'diagram.svg' },
-  { key: 'dxf', label: 'CAD (DXF)', file: 'diagram.dxf' },
+  { key: 'dxf', label: 'Annotated source CAD (DXF)', file: 'annotated.dxf' },
+  { key: 'schematic_dxf', label: 'Standalone layout CAD (DXF)', file: 'standalone-layout.dxf' },
   { key: 'pdf', label: 'Report (PDF)', file: 'report.pdf' },
   { key: 'md', label: 'Summary (Markdown)', file: 'summary.md' },
 ]
@@ -26,11 +27,17 @@ export function ResultsView({ result, useCaseTitle, location, primaryName, onNew
 
   return (
     <div className="results">
+      {result.status === 'completed_with_issues' && (
+        <div className="banner banner-error">
+          Two planning attempts completed, but unresolved issues remain. This is
+          a diagnostic output and not a compliant final design.
+        </div>
+      )}
       <div className="results-head">
         <h1 className="results-title">Rooftop Anchor Analysis &amp; Cost Estimate</h1>
         <div className="results-head-actions">
           {DOWNLOADS.filter((d) => result.outputs[d.key]).map((d) => (
-            <a key={d.key} className="btn btn-ghost btn-sm" href={resolveUrl(result.outputs[d.key])} download={d.file}>
+            <a key={d.key} className="btn btn-ghost btn-sm" href={resolveUrl(result.outputs[d.key])} download={`${result.session_id}_${d.file}`}>
               {d.key.toUpperCase()}
             </a>
           ))}
@@ -73,7 +80,7 @@ export function ResultsView({ result, useCaseTitle, location, primaryName, onNew
                     <div className="download-row" key={d.key}>
                       <span className="download-label">{d.label}</span>
                       {url
-                        ? <a className="btn btn-ghost btn-sm" href={resolveUrl(url)} download={d.file}>Download</a>
+                        ? <a className="btn btn-ghost btn-sm" href={resolveUrl(url)} download={`${result.session_id}_${d.file}`}>Download</a>
                         : <span className="download-missing">unavailable</span>}
                     </div>
                   )
@@ -88,9 +95,14 @@ export function ResultsView({ result, useCaseTitle, location, primaryName, onNew
             <h3 className="side-title">Inputs &amp; Sources</h3>
             <dl className="kv">
               <dt>Use case</dt><dd>{useCaseTitle}</dd>
+              <dt>Analysis ID</dt><dd>{result.session_id}</dd>
               <dt>Location</dt><dd>{location}</dd>
               <dt>Primary drawing</dt><dd>{primaryName ?? '—'}</dd>
-              <dt>Status</dt><dd><span className="pill pill-pass">{result.status}</span></dd>
+              <dt>Status</dt><dd>
+                <span className={`pill ${result.status === 'complete' ? 'pill-pass' : 'pill-fail'}`}>
+                  {result.status}
+                </span>
+              </dd>
             </dl>
           </div>
 

@@ -1,7 +1,8 @@
 // API data contracts (mirror the FastAPI responses in backend/app/api/routes.py).
 
 export type InputKind = 'number' | 'text'
-export type JobStatus = 'complete' | 'needs_input' | 'error'
+export type JobStatus = 'complete' | 'completed_with_issues' | 'needs_input' | 'error'
+export type ReportStatus = 'complete' | 'completed_with_issues' | 'error'
 
 export interface RequiredInput {
   key: string
@@ -37,6 +38,21 @@ export interface AnalyzeResult {
   summary_markdown: string | null
   outputs: Record<string, string>
   error: string | null
+  issues?: {
+    code: string
+    message: string
+    window_id: string | null
+    line_id: string | null
+  }[]
+}
+
+export interface PreviousReport {
+  id: string
+  original_filename: string | null
+  analyzed_at: number
+  status: ReportStatus
+  expires_at: number | null
+  outputs: Record<string, string>
 }
 
 export interface UploadInstruction {

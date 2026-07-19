@@ -1,6 +1,6 @@
 // In-browser mock of the backend so the SPA runs with no server.
 // Mirrors the shapes and behaviour of backend/app/api/routes.py.
-import type { AnalyzeArgs, AnalyzeResult, UseCase } from './types'
+import type { AnalyzeArgs, AnalyzeResult, PreviousReport, UseCase } from './types'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -20,6 +20,20 @@ const RDS: UseCase = {
 export async function listUseCases(): Promise<UseCase[]> {
   await delay(200)
   return [RDS]
+}
+
+export async function listPreviousReports(): Promise<PreviousReport[]> {
+  await delay(200)
+  return [
+    {
+      id: 'a1b2c3d4e5f6',
+      original_filename: 'sample-roof.dwg',
+      analyzed_at: Date.now() / 1000 - 3600,
+      status: 'complete',
+      expires_at: Date.now() / 1000 + 6 * 86400,
+      outputs: buildOutputs(),
+    },
+  ]
 }
 
 const SAFETY_KEYS = ['column_spacing', 'building_height']
@@ -127,6 +141,7 @@ function buildOutputs(): Record<string, string> {
   return {
     svg: dataUrl(sampleDiagramSvg(), 'image/svg+xml'),
     dxf: dataUrl('(mock DXF — run against the real backend for a true CAD file)', 'application/dxf'),
+    schematic_dxf: dataUrl('(mock standalone DXF)', 'application/dxf'),
     pdf: dataUrl('(mock PDF — run against the real backend for the certified report)', 'application/pdf'),
     md: dataUrl(SUMMARY_MD, 'text/markdown'),
   }
@@ -140,7 +155,7 @@ export async function analyze(args: AnalyzeArgs): Promise<AnalyzeResult> {
   // First pass with missing safety-critical inputs -> ask (bounded intake).
   if (missing.length && !args.sessionId) {
     return {
-      session_id: 'mock-session',
+      session_id: 'a1b2c3d4e5f6',
       status: 'needs_input',
       questions: missing.map((k) => QUESTIONS[k as keyof typeof QUESTIONS]),
       assumptions: [],
@@ -151,7 +166,7 @@ export async function analyze(args: AnalyzeArgs): Promise<AnalyzeResult> {
     }
   }
   return {
-    session_id: args.sessionId ?? 'mock-session',
+    session_id: args.sessionId ?? 'a1b2c3d4e5f6',
     status: 'complete',
     questions: [],
     assumptions: ASSUMPTIONS,

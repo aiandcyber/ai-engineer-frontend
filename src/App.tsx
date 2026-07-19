@@ -8,6 +8,7 @@ import { SetupView } from './components/SetupView'
 import { IntakeView } from './components/IntakeView'
 import { ResultsView } from './components/ResultsView'
 import { ChatView } from './components/ChatView'
+import { PreviousReportsView } from './components/PreviousReportsView'
 
 const MAX_ROUNDS = 2
 
@@ -113,6 +114,10 @@ export default function App() {
       {tab === 'chat' ? (
         <main className="container">
           <ChatView useCase={useCaseName} />
+        </main>
+      ) : tab === 'reports' ? (
+        <main className="container">
+          <PreviousReportsView />
         </main>
       ) : (
         <main className="container">
